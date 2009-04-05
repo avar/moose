@@ -251,7 +251,7 @@ sub clone {
     } else {
         my ( @init, @non_init );
 
-        foreach my $attr ( grep { $_->has_value($self) } $self->meta->compute_all_applicable_attributes ) {
+        foreach my $attr ( grep { $_->has_value($self) } $self->meta->get_all_attributes ) {
             push @{ $attr->has_init_arg ? \@init : \@non_init }, $attr;
         }
 
