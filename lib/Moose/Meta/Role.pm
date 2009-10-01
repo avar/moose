@@ -72,8 +72,8 @@ foreach my $action (
         }
     },  
     {
-        name        => 'attribute_map',
-        attr_reader => 'get_attribute_map',
+        name        => '_attribute_map',
+        attr_reader => '_attribute_map',
         methods     => {
             get       => 'get_attribute',
             get_list  => 'get_attribute_list',
@@ -135,7 +135,7 @@ sub add_attribute {
     else {
         $attr_desc = { @_ };
     }
-    $self->get_attribute_map->{$name} = $attr_desc;
+    $self->_attribute_map->{$name} = $attr_desc;
 }
 
 # DEPRECATED 
@@ -623,9 +623,9 @@ sub create {
 # );
 # 
 # has 'attribute_map' => (
-#     metaclass => 'Collection::Hash',
-#     reader    => 'get_attribute_map',
-#     isa       => 'HashRef[Str]',    
+#     metaclass => 'Hash',
+#     reader    => '_attribute_map',
+#     isa       => 'HashRef[Str]',
 #     provides => {
 #         # 'set'  => 'add_attribute' # has some special crap in it
 #         'get'    => 'get_attribute',
@@ -812,9 +812,7 @@ probably not that much really).
 
 =item B<has_attribute>
 
-=item B<get_attribute>
-
-=item B<get_attribute_list>
+=item B<< $metarole->get_attribute_list >>
 
 =item B<get_attribute_map>
 
