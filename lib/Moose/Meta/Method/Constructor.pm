@@ -124,9 +124,23 @@ sub _generate_instance {
 
 sub _generate_slot_initializers {
     my ($self) = @_;
-    return (join ";\n" => map {
-        $self->_generate_slot_initializer($_)
-    } 0 .. (@{$self->_attributes} - 1)) . ";\n";
+    my $strict = $self->options->{strict_constructor};
+
+    my $initializers = '';
+
+    if($strict){
+        $initializers .= 'my $used = 0;' . "\n";
+    }
+
+    foreach my $idx(0 .. @{$self->_attributes} - 1){
+        $initializers .= $self->_generate_slot_initializer($idx, $strict) . ";\n";
+    }
+
+    if($strict){
+        $initializers .= 'if($used < keys %{$params}){ $meta->_report_unknown_args($attrs, $params) }'."\n";
+    }
+
+    return $initializers;
 }
 
 sub _generate_BUILDARGS {
@@ -188,9 +202,7 @@ sub _generate_triggers {
 }
 
 sub _generate_slot_initializer {
-    my $self  = shift;
-    my $index = shift;
-
+    my($self, $index, $strict) = @_;
     my $attr = $self->_attributes->[$index];
 
     my @source = ('## ' . $attr->name);
@@ -210,6 +222,7 @@ sub _generate_slot_initializer {
             push @source => $self->_generate_type_constraint_and_coercion($attr, $index)
                 if $is_moose;
             push @source => $self->_generate_slot_assignment($attr, '$val', $index);
+            push @source => '$used++;'."\n" if $strict;
             push @source => "} else {";
         }
             my $default;
@@ -251,6 +264,7 @@ sub _generate_slot_initializer {
                 );
             }
             push @source => $self->_generate_slot_assignment($attr, '$val', $index);
+            push @source => '$used++;'."\n" if $strict;
 
         push @source => "}";
     }
@@ -349,6 +363,28 @@ sub _generate_default_value {
     }
 }
 
+sub _report_unknown_args {
+    my ($self, $attrs, $args) = @_;
+
+    my @unknowns;
+    my %init_args;
+    foreach my $attr(@{$attrs}){
+        my $init_arg = $attr->init_arg;
+        if(defined $init_arg){
+            $init_args{$init_arg}++;
+        }
+    }
+
+    while(my $key = each %{$args}){
+        if(!exists $init_args{$key}){
+            push @unknowns, $key;
+        }
+    }
+
+    $self->throw_error( sprintf
+        "Unknown attribute passed to the constructor of %s: %s",
+            $self->associated_metaclass->name, Moose::Util::english_list(@unknowns) );
+}
 1;
 
 __END__
