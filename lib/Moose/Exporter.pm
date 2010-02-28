@@ -319,11 +319,9 @@ sub _make_import_sub {
         # Also, this makes sure we preserve backwards compat for
         # _get_caller, so it always sees the arguments in the
         # expected order.
-        my $traits;
-        ( $traits, @_ ) = _strip_traits(@_);
 
-        my $metaclass;
-        ( $metaclass, @_ ) = _strip_metaclass(@_);
+        my($metaclass, $traits, $strict, @args) = _strip_command(@_);
+
         $metaclass
             = Moose::Util::resolve_metaclass_alias( 'Class' => $metaclass )
             if defined $metaclass && length $metaclass;
@@ -333,7 +331,7 @@ sub _make_import_sub {
         # else (like Squirrel).
         my $class = $exporting_package;
 
-        $CALLER = _get_caller(@_);
+        $CALLER = _get_caller(@args);
 
         # this works because both pragmas set $^H (see perldoc
         # perlvar) which affects the current compilation -
@@ -370,7 +368,19 @@ sub _make_import_sub {
             );
         }
 
-        my ( undef, @args ) = @_;
+        if(defined $strict) { # -strict
+            if($did_init_meta) {
+                $CALLER->meta->strict(1);
+            }
+            else {
+                require Moose;
+                Moose->throw_error(
+                    "Cannot provide -strict when $class does not have an init_meta() method"
+                );
+            }
+        }
+
+        shift @args; # discard the class name
         my $extra = shift @args if ref $args[0] eq 'HASH';
 
         $extra ||= {};
@@ -389,30 +399,33 @@ sub _make_import_sub {
     };
 }
 
-sub _strip_traits {
-    my $idx = first_index { $_ eq '-traits' } @_;
 
-    return ( [], @_ ) unless $idx >= 0 && $#_ >= $idx + 1;
+sub _strip_command {
+    my @args;
+    my $metaclass;
+    my @traits;
+    my $strict;
 
-    my $traits = $_[ $idx + 1 ];
+    for(my $i = 0; $i < @_; $i++){
+        my $arg = $_[$i];
+        if($arg eq '-metaclass') {
+            $metaclass = $_[++$i];
+        }
+        elsif($arg eq '-traits') {
+            ++$i;
+            @traits = ref($_[$i]) ? @{$_[$i]} : $_[$i];
+        }
+        elsif($arg eq '-strict') {
+            $strict = Scalar::Util::looks_like_number($_[$i+1])
+                ? $_[++$i] # allow -strict => 0 | 1
+                : 1;       # default is true
+        }
+        else {
+            push @args, $arg;
+        }
+    }
 
-    splice @_, $idx, 2;
-
-    $traits = [$traits] unless ref $traits;
-
-    return ( $traits, @_ );
-}
-
-sub _strip_metaclass {
-    my $idx = first_index { $_ eq '-metaclass' } @_;
-
-    return ( undef, @_ ) unless $idx >= 0 && $#_ >= $idx + 1;
-
-    my $metaclass = $_[ $idx + 1 ];
-
-    splice @_, $idx, 2;
-
-    return ( $metaclass, @_ );
+    return ($metaclass, \@traits, $strict, @args);
 }
 
 sub _apply_meta_traits {

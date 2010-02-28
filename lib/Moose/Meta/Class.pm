@@ -56,6 +56,10 @@ __PACKAGE__->meta->add_attribute('error_class' => (
     default  => 'Moose::Error::Default',
 ));
 
+__PACKAGE__->meta->add_attribute('strict' => (
+    accessor => 'strict',
+));
+
 sub initialize {
     my $class = shift;
     my $pkg   = shift;
@@ -254,9 +258,12 @@ sub new_object {
     my $params = @_ == 1 ? $_[0] : {@_};
     my $self   = $class->SUPER::new_object($params);
 
-    foreach my $attr ( $class->get_all_attributes() ) {
+    my $used;
+    $used = 0 if $class->strict;
 
-        next unless $attr->can('has_trigger') && $attr->has_trigger;
+    foreach my $attr ( $class->get_all_attributes() ) {
+        my $has_trigger = ($attr->can('has_trigger') && $attr->has_trigger);
+        next if !defined($used) && !$has_trigger;
 
         my $init_arg = $attr->init_arg;
 
@@ -264,29 +271,67 @@ sub new_object {
 
         next unless exists $params->{$init_arg};
 
-        $attr->trigger->(
-            $self,
-            (
-                  $attr->should_coerce
-                ? $attr->get_read_method_ref->($self)
-                : $params->{$init_arg}
-            ),
-        );
+        $used++ if defined $used;
+
+        if($has_trigger){
+            $attr->trigger->(
+                $self,
+                (
+                      $attr->should_coerce
+                    ? $attr->get_read_method_ref->($self)
+                    : $params->{$init_arg}
+                ),
+            );
+        }
+    }
+
+    if(defined($used) && $used < keys %{$params}){
+        $class->_report_unknown_args([$class->get_all_attributes], $params);
     }
 
     return $self;
 }
 
+sub _report_unknown_args {
+    my ($self, $attrs, $args) = @_;
+
+    my %init_args;
+    foreach my $attr(@{$attrs}){
+        my $init_arg = $attr->init_arg;
+        if(defined $init_arg){
+            $init_args{$init_arg}++;
+        }
+    }
+
+    my @unknowns = grep{ !exists $init_args{$_} } keys %{$args};
+
+    $self->throw_error( sprintf
+        "Unknown attribute passed to the constructor of %s: %s",
+            $self->name, Moose::Util::english_list(@unknowns) );
+}
+
 sub superclasses {
     my $self = shift;
-    my @supers = @_;
-    foreach my $super (@supers) {
+
+    return $self->SUPER::superclasses() unless @_;
+
+    my $strict_is_set = defined($self->strict);
+
+    foreach my $super (@_) {
         Class::MOP::load_class($super);
-        my $meta = Class::MOP::class_of($super);
-        $self->throw_error("You cannot inherit from a Moose Role ($super)")
-            if $meta && $meta->isa('Moose::Meta::Role')
+        if(my $meta = Class::MOP::get_metaclass_by_name($super)) {
+            $self->throw_error("You cannot inherit from a Moose Role ($super)")
+                if $meta->isa('Moose::Meta::Role');
+
+            if(!$strict_is_set && $meta->can('strict')){
+                if(defined(my $strict = $meta->strict)){
+                    $strict_is_set = 1;
+                    $self->strict($strict);
+                }
+            }
+        }
     }
-    return $self->SUPER::superclasses(@supers);
+    return $self->SUPER::superclasses(@_);
 }
 
 ### ---------------------------------------------

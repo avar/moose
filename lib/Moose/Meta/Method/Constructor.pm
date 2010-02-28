@@ -124,7 +124,7 @@ sub _generate_instance {
 
 sub _generate_slot_initializers {
     my ($self) = @_;
-    my $strict = $self->options->{strict_constructor};
+    my $strict = $self->associated_metaclass->strict;
 
     my $initializers = '';
 
@@ -137,7 +137,7 @@ sub _generate_slot_initializers {
     }
 
     if($strict){
-        $initializers .= 'if($used < keys %{$params}){ $meta->_report_unknown_args($attrs, $params) }'."\n";
+        $initializers .= 'if($used < keys %{$params}){ $meta->associated_metaclass->_report_unknown_args($attrs, $params) }'."\n";
     }
 
     return $initializers;
@@ -264,7 +264,7 @@ sub _generate_slot_initializer {
                 );
             }
             push @source => $self->_generate_slot_assignment($attr, '$val', $index);
-            push @source => '$used++;'."\n" if $strict;
+            push @source => '++$used;'."\n" if $strict;
 
         push @source => "}";
     }
@@ -363,28 +363,6 @@ sub _generate_default_value {
     }
 }
 
-sub _report_unknown_args {
-    my ($self, $attrs, $args) = @_;
-
-    my @unknowns;
-    my %init_args;
-    foreach my $attr(@{$attrs}){
-        my $init_arg = $attr->init_arg;
-        if(defined $init_arg){
-            $init_args{$init_arg}++;
-        }
-    }
-
-    while(my $key = each %{$args}){
-        if(!exists $init_args{$key}){
-            push @unknowns, $key;
-        }
-    }
-
-    $self->throw_error( sprintf
-        "Unknown attribute passed to the constructor of %s: %s",
-            $self->associated_metaclass->name, Moose::Util::english_list(@unknowns) );
-}
 1;
 
 __END__
