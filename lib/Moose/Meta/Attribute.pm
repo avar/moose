@@ -496,7 +496,7 @@ sub set_value {
         $type_constraint->_compiled_type_constraint->($value)
             || $self->throw_error("Attribute (" 
                      . $self->name 
-                     . ") does not pass the type constraint because " 
+                     . ") does not pass the type constraint because: " 
                      . $type_constraint->get_message($value), object => $instance, data => $value);
     }
 
