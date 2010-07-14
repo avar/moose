@@ -7,6 +7,9 @@ for, noteworthy changes.
     constraint has a coercion defined. If it doesn't, an error will be thrown
     when the attribute is defined. (Dave Rolsky)
 
+  * Removed the long-deprecated Moose::Meta::Role->alias_method metohd. (Dave
+    Rolsky).
+
   [NEW FEATURES]
 
   * We no longer unimport strict and warnings when Moose, Moose::Role, or
