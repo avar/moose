@@ -17,6 +17,7 @@ BEGIN {
             isa    => 'Str',
             coerce => 1,
         );
+        __PACKAGE__->new( foo => "hlagh" );
         }
         qr/\QYou cannot coerce an attribute (foo) unless its type (Str) has a coercion/,
         'Cannot coerce unless the type has a coercion';
@@ -26,8 +27,19 @@ BEGIN {
             isa    => 'Str',
             coerce => 1,
         );
+        __PACKAGE__->new( bar => "hlagh" );
         }
         qr/\QYou cannot coerce an attribute (bar) unless its type (Str) has a coercion/,
+        'Cannot coerce unless the type has a coercion - different attribute';
+
+    ::stderr_like{ has hlagh => (
+            is     => 'ro',
+            isa    => 'HashRef',
+            coerce => 1,
+        );
+        __PACKAGE__->new( hlagh => {} );
+        }
+        qr/\QYou cannot coerce an attribute (hlagh) unless its type (HashRef) has a coercion/,
         'Cannot coerce unless the type has a coercion - different attribute';
 }
 
